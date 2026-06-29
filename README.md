@@ -246,8 +246,7 @@ Der `EnergyParameter`-Response des Gateways enthält meist mehr Felder als aktue
 
 | Version | Änderungen |
 |---|---|
-| 1.1.0 | Wechselrichter Hardware-Schalter (AC Relais, Einspeisung, Entladung) |
-| 1.0.0 | Erstveröffentlichung — Auto-Erkennung, Sensoren, Sub-Gerät-Schalter |
+| 1.0.0 | Erstveröffentlichung — Auto-Erkennung via mDNS, Sensoren (Systemübersicht + Speicher-Detail), Sub-Gerät-Schalter (Steckdose, Ladestation, Heizung) |
 
 ---
 
