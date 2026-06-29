@@ -141,25 +141,44 @@ class AECCDeviceClient:
                 "CommandSource": "Web",
                 "ControlsParameter": {
                     "StartAddr": start_addr,
+                    "Num": 1,
                     "Data": data_val
                 }
             }
             writer.write(json.dumps(request).encode() + b'\n')
             await writer.drain()
-            _LOGGER.info(f"Sent hardware param: startAddr={start_addr}, data={data_val}")
+            _LOGGER.warning(
+                f"[InverterSwitch] Sent InverterParam: startAddr={start_addr}, data={data_val} | "
+                f"full request: {request}"
+            )
 
             buffer = b''
+            deadline = asyncio.get_event_loop().time() + 8
             while True:
-                reader, _ = await self.tcp_manager.get_reader_writer()
-                chunk = await reader.read(4096)
+                remaining = deadline - asyncio.get_event_loop().time()
+                if remaining <= 0:
+                    _LOGGER.warning(
+                        f"[InverterSwitch] Timeout waiting for gateway response to InverterParam "
+                        f"(startAddr={start_addr}). Gateway may not support this command locally."
+                    )
+                    return False
+                try:
+                    reader, _ = await self.tcp_manager.get_reader_writer()
+                    chunk = await asyncio.wait_for(reader.read(4096), timeout=remaining)
+                except asyncio.TimeoutError:
+                    _LOGGER.warning(
+                        f"[InverterSwitch] Timeout waiting for gateway response to InverterParam "
+                        f"(startAddr={start_addr}). Gateway may not support this command locally."
+                    )
+                    return False
                 if not chunk:
                     raise ConnectionResetError("Device closed the connection")
                 buffer += chunk
                 try:
                     json_data = json.loads(buffer.decode('utf-8'))
                     self.serial_number += 1
-                    _LOGGER.info(f"Hardware param response: {json_data}")
-                    return "succeed" in str(json_data)
+                    _LOGGER.warning(f"[InverterSwitch] Gateway response: {json_data}")
+                    return "succeed" in str(json_data).lower()
                 except json.JSONDecodeError:
                     await asyncio.sleep(0.1)
 
