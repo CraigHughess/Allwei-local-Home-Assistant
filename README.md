@@ -242,11 +242,37 @@ Der `EnergyParameter`-Response des Gateways enthält meist mehr Felder als aktue
 
 ---
 
+## Geplante Features (Roadmap)
+
+| Version | Geplant |
+|---|---|
+| **v1.1.0** | Wechselrichter-Schalter via lokales Gateway (AC Off-Grid, Max. Einspeisung, Batterie-Entladung) — sofern Firmware-Support vorhanden |
+| **v1.2.0** | Energie-Statistiken (Tages-/Monatszähler), erweiterte Batterie-Diagnose |
+| **Zukunft** | Konfigurierbare Poll-Intervalle, Mehrere Gateways gleichzeitig, Automatische Sensor-Erkennung aus dem kompletten EnergyParameter-Response |
+
+---
+
 ## Versionsverlauf
 
 | Version | Änderungen |
 |---|---|
 | 1.0.0 | Erstveröffentlichung — Auto-Erkennung via mDNS, Sensoren (Systemübersicht + Speicher-Detail), Sub-Gerät-Schalter (Steckdose, Ladestation, Heizung) |
+
+---
+
+## Bildnachweis
+
+Das Logo (`www/local/aecc_local_plugin/logo.png`) stammt von der offiziellen Allwei-Website [allwei.de](https://www.allwei.de) und wird hier ausschließlich zur Wiedererkennbarkeit der Integration verwendet. Alle Marken- und Urheberrechte liegen bei den jeweiligen Eigentümern.
+
+---
+
+## Haftungsausschluss & Keine Zugehörigkeit
+
+Dieses Projekt ist ein **unabhängiges Community-Projekt** und steht in **keinerlei Verbindung** mit der Allwei GmbH, deren Muttergesellschaft, Tochtergesellschaften oder Partnern. Es handelt sich weder um ein offizielles Produkt noch um eine offiziell unterstützte Lösung von Allwei.
+
+Die Bezeichnung „Allwei" sowie zugehörige Logos und Markenzeichen sind Eigentum ihrer jeweiligen Inhaber. Die Nutzung in diesem Projekt erfolgt ausschließlich zur Identifikation der kompatiblen Hardware.
+
+Die Verwendung dieser Integration erfolgt auf eigene Verantwortung. Der Autor übernimmt keine Haftung für Schäden an Geräten, Datenverlust oder andere Folgen, die durch den Einsatz dieser Software entstehen können.
 
 ---
 
