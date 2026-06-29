@@ -6,17 +6,11 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.const import (
     UnitOfPower,
     PERCENTAGE,
+    UnitOfTemperature,
 )
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
-
-# 用于映射单位
-from homeassistant.const import (
-    UnitOfPower,
-    PERCENTAGE,
-    UnitOfTemperature,
-)
 
 SENSOR_MAP = {
     "SSumInfoList": {
@@ -29,6 +23,17 @@ SENSOR_MAP = {
         "battery_output_power": ("TotalBatteryOutputPower", UnitOfPower.WATT),
         "grid_output_power": ("TotalGridOutputPower", UnitOfPower.WATT),
         "backup_power": ("TotalBackUpPower", UnitOfPower.WATT),
+    },
+    "Storage_list": {
+        "battery_soc": ("BatterySoc", PERCENTAGE),
+        "battery_discharging_power": ("BatteryDischargingPower", UnitOfPower.WATT),
+        "battery_charging_power": ("BatteryChargingPower", UnitOfPower.WATT),
+        "pv_charging_power": ("PvChargingPower", UnitOfPower.WATT),
+        "ac_charging_power": ("AcChargingPower", UnitOfPower.WATT),
+        "ac_in_active_power": ("AcInActivePower", UnitOfPower.WATT),
+        "offgrid_load_power": ("OffGridLoadPower", UnitOfPower.WATT),
+        "pv1_power": ("Pv1Power", UnitOfPower.WATT),
+        "pv2_power": ("Pv2Power", UnitOfPower.WATT),
     },
     "PlugInfoList": {
         "active_power": ("PlugActvePower", UnitOfPower.WATT),
@@ -53,39 +58,31 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     device_sn = config_entry.data["device_sn"]
 
     sensors = []
-    # 遍历map
     for data_type, field_map in SENSOR_MAP.items():
         raw_data = coordinator.data.get(data_type)
         if not raw_data:
-            continue  # 数据不存在，跳过
+            continue
 
         if isinstance(raw_data, list):
-            # 遍历各个设备数组
             for item in raw_data:
-                sn = item.get("PlugSN") or item.get("ChargerSN") or item.get("HotSN")
+                sn = (item.get("PlugSN") or item.get("ChargerSN") or
+                      item.get("HotSN") or item.get("StorageSN"))
                 if not sn:
-                    continue  # 缺少 SN，跳过
+                    continue
 
                 for key, (path, unit) in field_map.items():
                     value = item.get(path)
                     if value is None:
-                        continue  # 字段缺失，跳过
-
-                    unique_id = f"{device_sn}_{data_type.lower()}_{sn}_{key}"
-
-
+                        continue
                     sensors.append(
                         AECCSensor(coordinator, device_sn, item, data_type, key, path, unit)
                     )
         else:
-            # 非列表结构（如 SSumInfoList）
             item = raw_data
             for key, (path, unit) in field_map.items():
                 value = item.get(path)
                 if value is None:
-                    continue  # 字段缺失，跳过
-
-                unique_id = f"{device_sn}_{data_type.lower()}_{key}"
+                    continue
                 sensors.append(
                     AECCSensor(coordinator, device_sn, item, data_type, key, path, unit)
                 )
@@ -105,8 +102,12 @@ class AECCSensor(CoordinatorEntity, SensorEntity):
         self._unit = unit
         self._unique_id = self._generate_unique_id(device_sn, item)
 
+    def _device_sn_from_item(self, item):
+        return (item.get("PlugSN") or item.get("ChargerSN") or
+                item.get("HotSN") or item.get("StorageSN"))
+
     def _generate_unique_id(self, device_sn, item):
-        sn = item.get("PlugSN") or item.get("ChargerSN") or item.get("HotSN")
+        sn = self._device_sn_from_item(item)
         if sn:
             return f"aecc_{device_sn}_{self._data_type.lower()}_{sn}_{self._key}"
         else:
@@ -116,11 +117,9 @@ class AECCSensor(CoordinatorEntity, SensorEntity):
         """Read fresh item data from the coordinator instead of stale snapshot."""
         raw = self.coordinator.data.get(self._data_type) if self.coordinator.data else None
         if isinstance(raw, list):
-            own_sn = (self._item.get("PlugSN") or
-                      self._item.get("ChargerSN") or
-                      self._item.get("HotSN"))
+            own_sn = self._device_sn_from_item(self._item)
             for item in raw:
-                sn = item.get("PlugSN") or item.get("ChargerSN") or item.get("HotSN")
+                sn = self._device_sn_from_item(item)
                 if sn == own_sn:
                     return item
         elif isinstance(raw, dict):
@@ -129,7 +128,7 @@ class AECCSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def name(self):
-        sn = self._item.get("PlugSN") or self._item.get("ChargerSN") or self._item.get("HotSN")
+        sn = self._device_sn_from_item(self._item)
         if sn:
             return f"{sn} {self._key.replace('_', ' ').title()}"
         else:
@@ -145,18 +144,15 @@ class AECCSensor(CoordinatorEntity, SensorEntity):
         _LOGGER.debug(f"解析的key{self._path} value：{value}")
         if self._data_type == "HotInfoList" and self._path in ["HotTEMP", "HotTEMPMAX"]:
             try:
-
                 return float(value) / 10 if value is not None else 0.0
             except (ValueError, TypeError):
                 return 0.0
-
         if value is not None:
             try:
                 return float(value)
             except (ValueError, TypeError):
                 return 0.0
-        else:
-            return 0.0
+        return 0.0
 
     @property
     def native_unit_of_measurement(self):
@@ -166,15 +162,15 @@ class AECCSensor(CoordinatorEntity, SensorEntity):
     def device_info(self):
         model_map = {
             "SSumInfoList": "System Summary",
+            "Storage_list": "Battery Storage",
             "PlugInfoList": "Smart Plug",
             "ChargerInfoList": "EV Charger",
             "HotInfoList": "Heater"
         }
         model = model_map.get(self._data_type, self._data_type)
-
         return {
             "identifiers": {(DOMAIN, self._device_sn)},
             "name": self._device_sn,
             "model": model,
-            "manufacturer": "AECC",
+            "manufacturer": "Allwei",
         }
