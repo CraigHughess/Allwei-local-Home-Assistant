@@ -131,6 +131,46 @@ class AECCDeviceClient:
     async def turn_off_switch(self, attr) -> bool:
         return await self.send_switch_command(attr,False)
 
+    async def send_hardware_param(self, start_addr: int, data_val: int) -> bool:
+        """Send an inverter register write command (e.g. AC relay, feed-in flag)."""
+        try:
+            _, writer = await self.tcp_manager.get_reader_writer()
+            request = {
+                "Set": "InverterParam",
+                "SerialNumber": self.serial_number,
+                "CommandSource": "Web",
+                "ControlsParameter": {
+                    "StartAddr": start_addr,
+                    "Data": data_val
+                }
+            }
+            writer.write(json.dumps(request).encode() + b'\n')
+            await writer.drain()
+            _LOGGER.info(f"Sent hardware param: startAddr={start_addr}, data={data_val}")
+
+            buffer = b''
+            while True:
+                reader, _ = await self.tcp_manager.get_reader_writer()
+                chunk = await reader.read(4096)
+                if not chunk:
+                    raise ConnectionResetError("Device closed the connection")
+                buffer += chunk
+                try:
+                    json_data = json.loads(buffer.decode('utf-8'))
+                    self.serial_number += 1
+                    _LOGGER.info(f"Hardware param response: {json_data}")
+                    return "succeed" in str(json_data)
+                except json.JSONDecodeError:
+                    await asyncio.sleep(0.1)
+
+        except (ConnectionResetError, OSError, asyncio.IncompleteReadError) as e:
+            _LOGGER.warning(f"Connection error during send_hardware_param: {e}, reconnecting...")
+            await self.tcp_manager.reconnect()
+            return False
+        except Exception as e:
+            _LOGGER.error(f"Error sending hardware param: {e}", exc_info=True)
+            return False
+
     async def disconnect(self):
         """主动关闭连接"""
         await self.tcp_manager.close()
