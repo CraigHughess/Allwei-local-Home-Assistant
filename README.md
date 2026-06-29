@@ -1,208 +1,256 @@
 # Allwei Local — Home Assistant Integration
 
-> Local-first Home Assistant integration for **Allwei** energy storage systems (ESS).  
-> No cloud. No subscription. Direct TCP communication over your local network.
+> Lokale Home Assistant Integration für **Allwei** Energiespeichersysteme.  
+> Keine Cloud. Keine Subscription. Direkte TCP-Kommunikation im lokalen Netzwerk.
 
 ![Allwei Logo](www/local/aecc_local_plugin/logo.png)
 
 ---
 
-## Overview
+## Überblick
 
-This integration connects Home Assistant **directly** to your Allwei inverter/storage gateway over your local LAN — without routing data through any cloud server. It uses the same JSON-over-TCP protocol the Allwei gateway exposes on port 8899 and discovers devices automatically via **mDNS/Zeroconf** (no manual IP entry required).
+Diese Integration verbindet Home Assistant **direkt** mit deinem Allwei Wechselrichter/Gateway über dein lokales Netzwerk — ohne dass Daten über einen Cloud-Server geleitet werden. Geräte werden automatisch via **mDNS/Zeroconf** erkannt (keine manuelle IP-Eingabe nötig).
 
-### What you get
+### Was du bekommst
 
-| Category | Entities |
+| Kategorie | Entitäten |
 |---|---|
-| **System Summary** | Total active power, PV power, PV charge power, AC charge power, smart load power, battery SOC, battery output power, grid output power, backup power |
-| **Smart Plugs** | Active power per plug, on/off switch |
-| **EV Charger** | Connector 1 & 2 status, connector 1 & 2 charging power, on/off switch |
-| **Heater / Hot Water** | Active power, max power, temperature, max temperature, on/off switch |
-| **Inverter Controls** | AC Off-Grid relay, Max Feed-In Power flag, Battery Discharge enable |
+| **Systemübersicht** | Gesamte Wirkleistung, PV-Leistung, PV-Ladeleistung, AC-Ladeleistung, Smartload-Verbrauch, Batterie-SOC, Batterie-Ausgangsleistung, Netzleistung, Backup-Leistung |
+| **Smarte Steckdosen** | Wirkleistung je Steckdose, Ein/Aus-Schalter |
+| **Ladestation (EV)** | Connector 1 & 2 Status, Connector 1 & 2 Ladeleistung, Ein/Aus-Schalter |
+| **Heizung / Warmwasser** | Wirkleistung, Max-Leistung, Temperatur, Max-Temperatur, Ein/Aus-Schalter |
+| **Wechselrichter-Steuerung** | AC Off-Grid Relais, Maximale Einspeisung, Batterie-Entladung |
 
-All values update every **10 seconds** directly from the device — no polling of a cloud API.
+Alle Werte aktualisieren sich alle **10 Sekunden** direkt vom Gerät.
 
 ---
 
-## Requirements
+## Voraussetzungen
 
-- Home Assistant **2023.4** or newer
-- Allwei inverter/gateway on the **same local network** as your HA instance
-- The gateway must advertise itself via mDNS (`_http._tcp.local.`) — this is the default for all Allwei gateways with firmware supporting local API
+- Home Assistant **2023.4** oder neuer (auf Raspberry Pi oder anderem System)
+- Allwei Gateway im **selben lokalen Netzwerk** wie deine HA-Installation
+- Zugriff auf das HA-Dateisystem via **Samba Share**, **File Editor** oder **SSH** Add-on
 
 ---
 
 ## Installation
 
-### Option A — HACS (recommended)
+### Schritt 1 — Dateizugriff einrichten
 
-1. Open **HACS** → **Integrations** → click the three-dot menu → **Custom repositories**
-2. Add this repository URL and select category **Integration**
-3. Search for **Allwei Local** and click **Download**
-4. Restart Home Assistant
-5. Go to **Settings → Devices & Services → Add Integration** → search **Allwei Local**
+Für die Installation musst du Dateien auf deinen Raspberry Pi übertragen. Nutze eine der folgenden Methoden:
 
-### Option B — Manual
+- **Samba Share** Add-on: Einstellungen → Add-ons → Samba Share installieren & starten  
+- **File Editor** Add-on: für direkte Bearbeitung im Browser  
+- **Advanced SSH & Web Terminal** Add-on: für SSH-Zugriff
 
-1. Download or clone this repository
-2. Copy the entire `aecc_local_plugin` folder into your HA config directory:
-   ```
-   config/
-   └── custom_components/
-       └── aecc_local_plugin/   ← copy here
-   ```
-3. Copy the `www/local/aecc_local_plugin/` folder into your HA `www` directory:
-   ```
-   config/
-   └── www/
-       └── local/
-           └── aecc_local_plugin/
-               └── logo.png
-   ```
-4. Restart Home Assistant
-5. Go to **Settings → Devices & Services → Add Integration** → search **Allwei Local**
+> Der `config`-Ordner auf dem Raspberry Pi entspricht dem HA-Konfigurationsverzeichnis (`~/.homeassistant/config/` bzw. `/homeassistant/`).
 
 ---
 
-## Setup
+### Schritt 2 — Backend-Plugin installieren
 
-### Automatic discovery (recommended)
+1. Lade dieses Repository als ZIP herunter (oder klone es)
+2. Prüfe ob der Ordner `config/custom_components/` existiert — falls nicht, erstelle ihn
+3. Kopiere den Ordner `aecc_local_plugin` in `config/custom_components/`:
 
-If your Allwei gateway is on the same network, Home Assistant will **automatically discover** it and show a notification under **Settings → Devices & Services**. Click **Configure** and confirm the device — done.
+```
+config/
+└── custom_components/
+    └── aecc_local_plugin/    ← hier einfügen
+        ├── __init__.py
+        ├── manifest.json
+        ├── config_flow.py
+        ├── coordinator.py
+        ├── sensor.py
+        ├── switch.py
+        ├── tcp_client.py
+        ├── tcp_manager.py
+        └── const.py
+```
 
-The notification shows:
-- Device serial number (`s_sn`)
-- Local IP address (`s_ip`)
-- Device type (inverter, charger, battery, etc.)
-
-### Manual setup (if auto-discovery fails)
-
-1. Go to **Settings → Devices & Services → Add Integration**
-2. Search for **Allwei Local**
-3. Enter the gateway IP and port (default: `8899`)
+4. Starte Home Assistant neu: **Einstellungen → System → Neustart**
 
 ---
 
-## Entities Reference
+### Schritt 3 — Frontend-Panel einrichten
 
-### Sensors
+Das Panel zeigt Energiefluss-Grafiken und Steuerungselemente in der Seitenleiste.
 
-#### System Summary
+1. Prüfe ob der Ordner `config/www/` existiert — falls nicht, erstelle ihn
+2. Kopiere `aecc-ha-panel.mjs` direkt in den `www`-Ordner:
 
-| Entity | Unit | Description |
+```
+config/
+└── www/
+    └── aecc-ha-panel.mjs    ← hier einfügen
+```
+
+3. Öffne `config/configuration.yaml` (z.B. mit dem File Editor Add-on)
+4. Füge am Ende der Datei folgenden Block hinzu:
+
+```yaml
+panel_custom:
+  - name: aecc-ha-panel
+    sidebar_title: Allwei Dashboard
+    sidebar_icon: mdi:chart-donut
+    module_url: /local/aecc-ha-panel.mjs
+```
+
+---
+
+### Schritt 4 — Aktivierung
+
+1. Starte Home Assistant erneut neu: **Einstellungen → System → Neustart**
+2. Lade deinen Browser-Tab vollständig neu (ggf. Cache leeren mit `Strg+Shift+R`)
+3. In der linken Seitenleiste erscheint der neue Eintrag **Allwei Dashboard**
+
+---
+
+### Schritt 5 — Gerät einrichten
+
+**Automatische Erkennung (empfohlen)**
+
+Das Plugin erkennt dein Allwei-Gerät automatisch über Zeroconf, sobald es im selben Netzwerk aktiv ist. Eine Benachrichtigung erscheint unter **Einstellungen → Geräte & Dienste**. Klicke auf **Konfigurieren**, vergib einen Namen und bestätige.
+
+Die Erkennung zeigt:
+- Geräte-Seriennummer
+- Lokale IP-Adresse  
+- Gerätetyp (Wechselrichter, Ladestation, Batterie, ...)
+
+**Manuelle Einrichtung (falls automatische Erkennung fehlschlägt)**
+
+1. **Einstellungen → Geräte & Dienste → Integration hinzufügen**
+2. Nach **Allwei Local** suchen
+3. IP-Adresse und Port des Gateways eingeben (Standard-Port: `8899`)
+
+---
+
+## Entitäten-Referenz
+
+### Sensoren
+
+#### Systemübersicht (`SSumInfoList`)
+
+| Entität | Einheit | Beschreibung |
 |---|---|---|
-| `Total Active Power` | W | Combined grid meter active power |
-| `PV Power` | W | Total PV generation |
-| `PV Charge Power` | W | PV energy going to battery |
-| `AC Charge Power` | W | Grid energy going to battery |
-| `Smart Load Power` | W | Total smart load consumption |
-| `Battery SOC` | % | Average battery state of charge |
-| `Battery Output Power` | W | Battery discharge power |
-| `Grid Output Power` | W | Power exported to / imported from grid |
-| `Backup Power` | W | Backup output power |
+| Total Active Power | W | Gesamte Wirkleistung (Zähler) |
+| PV Power | W | Gesamte PV-Erzeugung |
+| PV Charge Power | W | PV-Leistung in Batterie |
+| AC Charge Power | W | Netzleistung in Batterie |
+| Smart Load Power | W | Smartload-Verbrauch gesamt |
+| Battery SOC | % | Durchschnittlicher Ladestand |
+| Battery Output Power | W | Batterie-Entladeleistung |
+| Grid Output Power | W | Netzeinspeisung / -bezug |
+| Backup Power | W | Backup-Ausgangsleistung |
 
-#### Per-Device (Smart Plug / EV Charger / Heater)
+#### Pro Gerät (Steckdose / Ladestation / Heizung)
 
-Entities are created dynamically for each sub-device discovered in the `EnergyParameter` response. Each device gets its own entity with the device serial number as prefix.
+Entitäten werden dynamisch für jedes erkannte Sub-Gerät erstellt. Jedes Gerät erhält seine eigene Entität mit der Geräte-Seriennummer als Prefix.
 
-### Switches
+### Schalter
 
-#### Sub-device Switches
-| Switch | Description |
+#### Sub-Gerät Schalter
+| Schalter | Beschreibung |
 |---|---|
-| `<PlugSN> Status` | Turn smart plug on/off |
-| `<ChargerSN> Status` | Enable/disable EV charger |
-| `<HotSN> Status` | Enable/disable heater / hot water controller |
+| `<PlugSN> Status` | Smarte Steckdose ein/aus |
+| `<ChargerSN> Status` | Ladestation freigeben/sperren |
+| `<HotSN> Status` | Heizung / Warmwasser ein/aus |
 
-#### Inverter Hardware Switches
-These switches write directly to inverter hardware registers over the local TCP connection — the same registers the Allwei cloud app controls remotely.
+#### Wechselrichter Hardware-Schalter
 
-| Switch | Register | Description |
+Diese Schalter schreiben direkt in Hardware-Register des Wechselrichters — lokal, ohne Cloud-Umweg.
+
+| Schalter | Register | Beschreibung |
 |---|---|---|
-| `AC Off-Grid Mode` | 123 | Enable/disable the off-grid AC output relay |
-| `Max Feed-In Power` | 124 | Activate maximum feed-in power flag |
-| `Battery Discharge` | 125 | Allow/block battery discharge globally |
+| AC Off-Grid Mode | 123 | Off-Grid AC-Ausgang (Relais) |
+| Max Feed-In Power | 124 | Maximale Einspeisung aktivieren |
+| Battery Discharge | 125 | Batterie-Entladung global freigeben/sperren |
 
-> **Note on state display:** The inverter switches use optimistic state tracking if the `EnergyParameter` response does not yet include the corresponding status field (`ACRelayStatus`, `MaxFeedPowerFlag`, `BasicDisChargeEnable`). Once toggled, the displayed state reflects what was sent — it updates to the real device state on the next polling cycle.
+> **Hinweis:** Die Wechselrichter-Schalter nutzen optimistisches State-Tracking, falls das Gateway die entsprechenden Statusfelder (`ACRelayStatus`, `MaxFeedPowerFlag`, `BasicDisChargeEnable`) noch nicht im `EnergyParameter`-Response mitliefert. Nach dem ersten Schalten zeigt HA den gesendeten Befehl — beim nächsten Poll-Zyklus wird der echte Gerätestatus übernommen.
 
 ---
 
-## How it works
+## Wie es funktioniert
 
 ```
 Home Assistant
-     │  JSON over TCP (LAN, port 8899)
+     │  JSON über TCP (LAN, Port 8899)
      ▼
-Allwei Gateway (auto-discovered via mDNS)
-     │  RS485 / internal bus
+Allwei Gateway  (automatisch erkannt via mDNS)
+     │  RS485 / interner Bus
      ▼
-Inverter · Battery · Smart Plugs · EV Charger · Heater
+Wechselrichter · Batterie · Steckdosen · Ladestation · Heizung
 ```
 
-1. **Discovery** — the gateway broadcasts an mDNS service record (`_http._tcp.local.`) with device metadata (SN, IP, type).
-2. **Data polling** — every 10 s the integration sends `{"Get": "EnergyParameter"}` over a persistent TCP connection and parses the JSON response.
-3. **Control** — sub-device on/off uses `{"Set": "SubDeviceControl"}`. Inverter-level switches use `{"Set": "InverterParam"}` with the hardware register address.
-4. **Reconnect** — if the TCP connection drops, the integration reconnects automatically before the next data fetch.
+1. **Erkennung** — das Gateway sendet einen mDNS-Eintrag (`_http._tcp.local.`) mit Gerätemetadaten (SN, IP, Typ)
+2. **Daten-Polling** — alle 10 s sendet die Integration `{"Get": "EnergyParameter"}` über eine persistente TCP-Verbindung und parst die JSON-Antwort
+3. **Steuerung** — Sub-Geräte (Steckdosen, Ladestation, Heizung) via `{"Set": "SubDeviceControl"}`, Wechselrichter-Schalter via `{"Set": "InverterParam"}` mit Register-Adresse
+4. **Reconnect** — bei Verbindungsabbruch verbindet sich die Integration automatisch wieder
 
 ---
 
-## Troubleshooting
+## Unterstützte Gerätetypen
 
-**Device not discovered automatically**
-- Confirm the gateway and HA are on the same subnet (mDNS does not cross subnet boundaries)
-- Check that no firewall blocks multicast traffic
-- Try a manual setup with the gateway IP instead
-
-**Entities show "Unavailable"**
-- Open HA logs and filter for `aecc_local_plugin`
-- The raw TCP response is logged at `INFO` level — look for `Received raw response:` to see exactly what the gateway returns
-- Verify the gateway port (default `8899`) is reachable: `nc -zv <gateway-ip> 8899`
-
-**Inverter switches show unknown state**
-- The gateway may not yet include `ACRelayStatus` / `MaxFeedPowerFlag` / `BasicDisChargeEnable` in the `EnergyParameter` response
-- Toggle the switch once — it will track state optimistically until the next full response cycle
-- The actual register address is shown in the entity's extra attributes for cross-referencing with the Allwei register map
-
-**Sensor values are 0.0 instead of missing**
-- This is by design for numeric sensors when the field is present but null — edit `sensor.py:138` to return `None` instead if you prefer HA to show "Unavailable"
-
----
-
-## Supported Devices
-
-| Device type code | Device |
+| Typ-Code | Gerät |
 |---|---|
-| 1 – 49 | Inverter / Off-grid / Storage unit |
-| 50 – 54 | Energy meter |
-| 55 – 79 | EV charger |
-| 80 – 109 | Battery module |
-| 110 – 139 | Smart plug |
-| 141 – 145 | AC coupler |
-| 150 – 155 | Hot water / heater controller |
-| 156 – 160 | Relay |
+| 1 – 49 | Wechselrichter / Off-Grid / Speichereinheit |
+| 50 – 54 | Energiezähler |
+| 55 – 79 | EV-Ladestation |
+| 80 – 109 | Batteriemodul |
+| 110 – 139 | Smarte Steckdose |
+| 141 – 145 | AC-Koppler |
+| 150 – 155 | Warmwasser- / Heizungsregler |
+| 156 – 160 | Relais |
 
 ---
 
-## Version history
+## Fehlerbehebung
 
-| Version | Changes |
+**Gerät wird nicht automatisch erkannt**
+- Stelle sicher, dass Gateway und HA im selben Subnetz sind (mDNS funktioniert nicht über Subnetz-Grenzen)
+- Prüfe, ob eine Firewall Multicast-Traffic blockiert
+- Nutze die manuelle Einrichtung mit der Gateway-IP
+
+**Entitäten zeigen "Nicht verfügbar"**
+- HA-Logs öffnen und nach `aecc_local_plugin` filtern
+- Der rohe TCP-Response wird auf `INFO`-Level geloggt — suche nach `Received raw response:` um zu sehen, was das Gateway zurückgibt
+- Gateway-Port erreichbar prüfen: `nc -zv <gateway-ip> 8899`
+
+**Panel erscheint nicht in der Seitenleiste**
+- Prüfe ob `aecc-ha-panel.mjs` korrekt in `config/www/` liegt
+- Prüfe ob der `panel_custom`-Block korrekt in `configuration.yaml` eingetragen ist (YAML-Einrückung beachten)
+- HA nach dem zweiten Neustart im Browser-Cache leeren (`Strg+Shift+R`)
+
+**Wechselrichter-Schalter reagieren nicht**
+- Das lokale Gateway muss `{"Set": "InverterParam"}` unterstützen — prüfe die Firmware-Version deines Gateways
+- Alternativ sind Register-Adresse und gesendeter Wert als Extra-Attribute an jeder Switch-Entität sichtbar (zur Diagnose)
+
+---
+
+## Neue Sensoren hinzufügen
+
+Der `EnergyParameter`-Response des Gateways enthält meist mehr Felder als aktuell gemappt. Um weitere Werte als Sensoren hinzuzufügen:
+
+1. HA-Logs auf `INFO` setzen und nach `Received raw response:` suchen → JSON komplett auslesen
+2. Gewünschtes Feld in `SENSOR_MAP` in `sensor.py` eintragen:
+   ```python
+   "SSumInfoList": {
+       "mein_neuer_sensor": ("FeldNameImJSON", UnitOfPower.WATT),
+   }
+   ```
+3. HA neu starten
+
+---
+
+## Versionsverlauf
+
+| Version | Änderungen |
 |---|---|
-| 1.1.0 | Added inverter hardware switches (AC relay, feed-in, discharge) |
-| 1.0.0 | Initial release — auto-discovery, sensors, sub-device switches |
+| 1.1.0 | Wechselrichter Hardware-Schalter (AC Relais, Einspeisung, Entladung) |
+| 1.0.0 | Erstveröffentlichung — Auto-Erkennung, Sensoren, Sub-Gerät-Schalter |
 
 ---
 
-## Contributing
-
-Pull requests are welcome. For major changes, please open an issue first.
-
-When adding new sensor fields:
-1. Add the field name and unit to `SENSOR_MAP` in `sensor.py`
-2. To find available field names, enable `INFO` logging and run `dump` — the raw `EnergyParameter` response contains all fields the gateway exposes
-
----
-
-## License
+## Lizenz
 
 MIT
