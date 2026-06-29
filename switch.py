@@ -205,9 +205,17 @@ class AECCInverterSwitch(CoordinatorEntity, SwitchEntity):
         # Fall back to last known optimistic state (always a bool, never None)
         return self._optimistic_state
 
+    def _get_storage_dev_addr(self) -> int:
+        """Return the DevAddr of the first storage device, falling back to 1."""
+        storage_list = (self.coordinator.data or {}).get("Storage_list", [])
+        if isinstance(storage_list, list) and storage_list:
+            return storage_list[0].get("DevAddr", 1)
+        return 1
+
     async def async_turn_on(self, **kwargs):
         _LOGGER.info(f"Inverter switch ON: {self._switch_name} (register {self._register})")
-        success = await self.coordinator.client.send_hardware_param(self._register, 1)
+        dev_addr = self._get_storage_dev_addr()
+        success = await self.coordinator.client.send_hardware_param(self._register, 1, dev_addr)
         if success:
             self._optimistic_state = True
         self.async_write_ha_state()
@@ -215,7 +223,8 @@ class AECCInverterSwitch(CoordinatorEntity, SwitchEntity):
 
     async def async_turn_off(self, **kwargs):
         _LOGGER.info(f"Inverter switch OFF: {self._switch_name} (register {self._register})")
-        success = await self.coordinator.client.send_hardware_param(self._register, 0)
+        dev_addr = self._get_storage_dev_addr()
+        success = await self.coordinator.client.send_hardware_param(self._register, 0, dev_addr)
         if success:
             self._optimistic_state = False
         self.async_write_ha_state()

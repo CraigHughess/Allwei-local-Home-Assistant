@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import json
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any
 from .tcp_manager import TCPClientManager
 
 _LOGGER = logging.getLogger(__name__)
@@ -23,13 +23,11 @@ class AECCDeviceClient:
         async with self._cmd_lock:
             try:
                 _, writer = await self.tcp_manager.get_reader_writer()
-
                 request = {
                     "Get": "EnergyParameter",
                     "SerialNumber": self.serial_number,
                     "CommandSource": "Web"
                 }
-
                 writer.write(json.dumps(request).encode() + b'\n')
                 await writer.drain()
                 _LOGGER.info(f"Sent request: {request}")
@@ -61,7 +59,6 @@ class AECCDeviceClient:
         async with self._cmd_lock:
             try:
                 _, writer = await self.tcp_manager.get_reader_writer()
-                _LOGGER.info(f"Send switch command: {attr}")
                 request = {
                     "Set": "SubDeviceControl",
                     "SerialNumber": self.serial_number,
@@ -115,16 +112,17 @@ class AECCDeviceClient:
     async def turn_off_switch(self, attr) -> bool:
         return await self.send_switch_command(attr, False)
 
-    async def send_hardware_param(self, start_addr: int, data_val: int) -> bool:
-        """Send an inverter register write command (e.g. AC relay, feed-in flag)."""
+    async def send_hardware_param(self, start_addr: int, data_val: int, dev_addr: int = 1) -> bool:
+        """Send a storage register write command via StorageControl."""
         async with self._cmd_lock:
             try:
                 _, writer = await self.tcp_manager.get_reader_writer()
                 request = {
-                    "Set": "InverterParam",
+                    "Set": "StorageControl",
                     "SerialNumber": self.serial_number,
                     "CommandSource": "Web",
                     "ControlsParameter": {
+                        "DevAddr": dev_addr,
                         "StartAddr": start_addr,
                         "Num": 1,
                         "Data": data_val
@@ -133,8 +131,8 @@ class AECCDeviceClient:
                 writer.write(json.dumps(request).encode() + b'\n')
                 await writer.drain()
                 _LOGGER.warning(
-                    f"[InverterSwitch] Sent InverterParam: startAddr={start_addr}, data={data_val} | "
-                    f"full request: {request}"
+                    f"[StorageSwitch] Sent StorageControl: devAddr={dev_addr}, "
+                    f"startAddr={start_addr}, data={data_val} | full request: {request}"
                 )
 
                 buffer = b''
@@ -143,8 +141,9 @@ class AECCDeviceClient:
                     remaining = deadline - asyncio.get_event_loop().time()
                     if remaining <= 0:
                         _LOGGER.warning(
-                            f"[InverterSwitch] Timeout waiting for gateway response to InverterParam "
-                            f"(startAddr={start_addr}). Gateway may not support this command locally."
+                            f"[StorageSwitch] Timeout waiting for gateway response to StorageControl "
+                            f"(devAddr={dev_addr}, startAddr={start_addr}). "
+                            f"Gateway may not support local register writes."
                         )
                         return False
                     try:
@@ -152,8 +151,9 @@ class AECCDeviceClient:
                         chunk = await asyncio.wait_for(reader.read(4096), timeout=remaining)
                     except asyncio.TimeoutError:
                         _LOGGER.warning(
-                            f"[InverterSwitch] Timeout waiting for gateway response to InverterParam "
-                            f"(startAddr={start_addr}). Gateway may not support this command locally."
+                            f"[StorageSwitch] Timeout waiting for gateway response to StorageControl "
+                            f"(devAddr={dev_addr}, startAddr={start_addr}). "
+                            f"Gateway may not support local register writes."
                         )
                         return False
                     if not chunk:
@@ -162,7 +162,7 @@ class AECCDeviceClient:
                     try:
                         json_data = json.loads(buffer.decode('utf-8'))
                         self.serial_number += 1
-                        _LOGGER.warning(f"[InverterSwitch] Gateway response: {json_data}")
+                        _LOGGER.warning(f"[StorageSwitch] Gateway response: {json_data}")
                         return "succeed" in str(json_data).lower()
                     except json.JSONDecodeError:
                         await asyncio.sleep(0.1)
