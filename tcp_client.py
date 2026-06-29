@@ -77,7 +77,7 @@ class AECCDeviceClient:
                     "DevAddr": attr['dev_addr'],
                     "IsThirdParty": attr['is_third_party'],
                     "CommSerialNum": 963,
-                    "DevType": 200,
+                    "DevType": attr.get('dev_type', 200),
                     "Param": {
                         "Switch": 1 if switch else 0,
                         "IsInterconnect": 0
