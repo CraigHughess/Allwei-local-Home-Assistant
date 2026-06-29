@@ -6,11 +6,17 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.const import (
     UnitOfPower,
     PERCENTAGE,
-    UnitOfTemperature,
 )
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
+
+# 用于映射单位
+from homeassistant.const import (
+    UnitOfPower,
+    PERCENTAGE,
+    UnitOfTemperature,
+)
 
 SENSOR_MAP = {
     "SSumInfoList": {
@@ -23,6 +29,17 @@ SENSOR_MAP = {
         "battery_output_power": ("TotalBatteryOutputPower", UnitOfPower.WATT),
         "grid_output_power": ("TotalGridOutputPower", UnitOfPower.WATT),
         "backup_power": ("TotalBackUpPower", UnitOfPower.WATT),
+    },
+    "Storage_list": {
+        "battery_soc": ("BatterySoc", PERCENTAGE),
+        "battery_discharging_power": ("BatteryDischargingPower", UnitOfPower.WATT),
+        "battery_charging_power": ("BatteryChargingPower", UnitOfPower.WATT),
+        "pv_charging_power": ("PvChargingPower", UnitOfPower.WATT),
+        "ac_charging_power": ("AcChargingPower", UnitOfPower.WATT),
+        "ac_in_active_power": ("AcInActivePower", UnitOfPower.WATT),
+        "offgrid_load_power": ("OffGridLoadPower", UnitOfPower.WATT),
+        "pv1_power": ("Pv1Power", UnitOfPower.WATT),
+        "pv2_power": ("Pv2Power", UnitOfPower.WATT),
     },
     "PlugInfoList": {
         "active_power": ("PlugActvePower", UnitOfPower.WATT),
@@ -47,31 +64,40 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     device_sn = config_entry.data["device_sn"]
 
     sensors = []
+    # 遍历map
     for data_type, field_map in SENSOR_MAP.items():
         raw_data = coordinator.data.get(data_type)
         if not raw_data:
-            continue
+            continue  # 数据不存在，跳过
 
         if isinstance(raw_data, list):
+            # 遍历各个设备数组
             for item in raw_data:
                 sn = (item.get("PlugSN") or item.get("ChargerSN") or
                       item.get("HotSN") or item.get("StorageSN"))
                 if not sn:
-                    continue
+                    continue  # 缺少 SN，跳过
 
                 for key, (path, unit) in field_map.items():
                     value = item.get(path)
                     if value is None:
-                        continue
+                        continue  # 字段缺失，跳过
+
+                    unique_id = f"{device_sn}_{data_type.lower()}_{sn}_{key}"
+
+
                     sensors.append(
                         AECCSensor(coordinator, device_sn, item, data_type, key, path, unit)
                     )
         else:
+            # 非列表结构（如 SSumInfoList）
             item = raw_data
             for key, (path, unit) in field_map.items():
                 value = item.get(path)
                 if value is None:
-                    continue
+                    continue  # 字段缺失，跳过
+
+                unique_id = f"{device_sn}_{data_type.lower()}_{key}"
                 sensors.append(
                     AECCSensor(coordinator, device_sn, item, data_type, key, path, unit)
                 )
@@ -133,15 +159,18 @@ class AECCSensor(CoordinatorEntity, SensorEntity):
         _LOGGER.debug(f"解析的key{self._path} value：{value}")
         if self._data_type == "HotInfoList" and self._path in ["HotTEMP", "HotTEMPMAX"]:
             try:
+
                 return float(value) / 10 if value is not None else 0.0
             except (ValueError, TypeError):
                 return 0.0
+
         if value is not None:
             try:
                 return float(value)
             except (ValueError, TypeError):
                 return 0.0
-        return 0.0
+        else:
+            return 0.0
 
     @property
     def native_unit_of_measurement(self):
@@ -156,9 +185,11 @@ class AECCSensor(CoordinatorEntity, SensorEntity):
             "HotInfoList": "Heater"
         }
         model = model_map.get(self._data_type, self._data_type)
+
         return {
             "identifiers": {(DOMAIN, self._device_sn)},
             "name": self._device_sn,
             "model": model,
-            "manufacturer": "Allwei",
+            "manufacturer": "AECC",
         }
+
