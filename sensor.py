@@ -19,17 +19,6 @@ SENSOR_MAP = {
         "grid_output_power": ("TotalGridOutputPower", UnitOfPower.WATT),
         "backup_power": ("TotalBackUpPower", UnitOfPower.WATT),
     },
-    "Storage_list": {
-        "battery_soc": ("BatterySoc", PERCENTAGE),
-        "battery_discharging_power": ("BatteryDischargingPower", UnitOfPower.WATT),
-        "battery_charging_power": ("BatteryChargingPower", UnitOfPower.WATT),
-        "pv_charging_power": ("PvChargingPower", UnitOfPower.WATT),
-        "ac_charging_power": ("AcChargingPower", UnitOfPower.WATT),
-        "ac_in_active_power": ("AcInActivePower", UnitOfPower.WATT),
-        "offgrid_load_power": ("OffGridLoadPower", UnitOfPower.WATT),
-        "pv1_power": ("Pv1Power", UnitOfPower.WATT),
-        "pv2_power": ("Pv2Power", UnitOfPower.WATT),
-    },
     "PlugInfoList": {
         "active_power": ("PlugActvePower", UnitOfPower.WATT),
     },
@@ -63,7 +52,6 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
                 sn = item.get("PlugSN") or item.get("ChargerSN") or item.get("HotSN")
                 if not sn:
                     continue
-
                 for key, (path, unit) in field_map.items():
                     if item.get(path) is None:
                         continue
