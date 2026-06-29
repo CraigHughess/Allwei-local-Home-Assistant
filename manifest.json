@@ -1,5 +1,5 @@
 {
-  "domain": "aecc_local_plugin",
+  "domain": "allwei_local_plugin",
   "name": "Allwei Local",
   "documentation": "https://github.com/CraigHughess/Allwei-local-Home-Assistant",
   "dependencies": [],
@@ -10,6 +10,6 @@
   "version": "1.0.0",
   "i18n_plural": false,
   "logos": {
-    "default": "/local/aecc_local_plugin/logo.png"
+    "default": "/local/allwei_local_plugin/logo.png"
   }
 }

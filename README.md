@@ -3,7 +3,7 @@
 > Lokale Home Assistant Integration für **Allwei** Energiespeichersysteme.  
 > Keine Cloud. Keine Subscription. Direkte TCP-Kommunikation im lokalen Netzwerk.
 
-![Allwei Logo](www/local/aecc_local_plugin/logo.png)
+![Allwei Logo](www/local/allwei_local_plugin/logo.png)
 
 ---
 
