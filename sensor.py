@@ -112,6 +112,21 @@ class AECCSensor(CoordinatorEntity, SensorEntity):
         else:
             return f"aecc_{device_sn}_{self._data_type.lower()}_{self._key}"
 
+    def _get_current_item(self):
+        """Read fresh item data from the coordinator instead of stale snapshot."""
+        raw = self.coordinator.data.get(self._data_type) if self.coordinator.data else None
+        if isinstance(raw, list):
+            own_sn = (self._item.get("PlugSN") or
+                      self._item.get("ChargerSN") or
+                      self._item.get("HotSN"))
+            for item in raw:
+                sn = item.get("PlugSN") or item.get("ChargerSN") or item.get("HotSN")
+                if sn == own_sn:
+                    return item
+        elif isinstance(raw, dict):
+            return raw
+        return self._item
+
     @property
     def name(self):
         sn = self._item.get("PlugSN") or self._item.get("ChargerSN") or self._item.get("HotSN")
@@ -126,7 +141,7 @@ class AECCSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def native_value(self):
-        value = self._item.get(self._path)
+        value = self._get_current_item().get(self._path)
         _LOGGER.debug(f"解析的key{self._path} value：{value}")
         if self._data_type == "HotInfoList" and self._path in ["HotTEMP", "HotTEMPMAX"]:
             try:
