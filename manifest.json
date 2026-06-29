@@ -1,7 +1,7 @@
 {
   "domain": "aecc_local_plugin",
-  "name": "AECC Local",
-  "documentation": "https://www.home-assistant.io/integrations/example_zeroconf",
+  "name": "Allwei Local",
+  "documentation": "https://github.com/CraigHughess/Allwei-local-Home-Assistant",
   "dependencies": [],
   "codeowners": ["@excalibur"],
   "requirements": ["zeroconf>=0.36.8"],
