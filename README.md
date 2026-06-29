@@ -72,7 +72,41 @@ config/
 
 ---
 
-### Schritt 3 — Gerät einrichten
+### Schritt 3 — Frontend-Panel einrichten
+
+Das Panel zeigt Energiefluss-Grafiken und Steuerungselemente in der Seitenleiste.
+
+1. Prüfe ob der Ordner `config/www/` existiert — falls nicht, erstelle ihn
+2. Kopiere `aecc-ha-panel.mjs` direkt in den `www`-Ordner:
+
+```
+config/
+└── www/
+    └── aecc-ha-panel.mjs    ← hier einfügen
+```
+
+3. Öffne `config/configuration.yaml` (z.B. mit dem File Editor Add-on)
+4. Füge am Ende der Datei folgenden Block hinzu:
+
+```yaml
+panel_custom:
+  - name: aecc-ha-panel
+    sidebar_title: Allwei Dashboard
+    sidebar_icon: mdi:chart-donut
+    module_url: /local/aecc-ha-panel.mjs
+```
+
+---
+
+### Schritt 4 — Aktivierung
+
+1. Starte Home Assistant erneut neu: **Einstellungen → System → Neustart**
+2. Lade deinen Browser-Tab vollständig neu (ggf. Cache leeren mit `Strg+Shift+R`)
+3. In der linken Seitenleiste erscheint der neue Eintrag **Allwei Dashboard**
+
+---
+
+### Schritt 5 — Gerät einrichten
 
 **Automatische Erkennung (empfohlen)**
 
@@ -208,12 +242,37 @@ Der `EnergyParameter`-Response des Gateways enthält meist mehr Felder als aktue
 
 ---
 
+## Geplante Features (Roadmap)
+
+| Version | Geplant |
+|---|---|
+| **v1.1.0** | Wechselrichter-Schalter via lokales Gateway (AC Off-Grid, Max. Einspeisung, Batterie-Entladung) — sofern Firmware-Support vorhanden |
+| **v1.2.0** | Energie-Statistiken (Tages-/Monatszähler), erweiterte Batterie-Diagnose |
+| **Zukunft** | Konfigurierbare Poll-Intervalle, Mehrere Gateways gleichzeitig, Automatische Sensor-Erkennung aus dem kompletten EnergyParameter-Response |
+
+---
+
 ## Versionsverlauf
 
 | Version | Änderungen |
 |---|---|
-| 1.1.0 | Wechselrichter Hardware-Schalter (AC Relais, Einspeisung, Entladung) |
-| 1.0.0 | Erstveröffentlichung — Auto-Erkennung, Sensoren, Sub-Gerät-Schalter |
+| 1.0.0 | Erstveröffentlichung — Auto-Erkennung via mDNS, Sensoren (Systemübersicht + Speicher-Detail), Sub-Gerät-Schalter (Steckdose, Ladestation, Heizung) |
+
+---
+
+## Bildnachweis
+
+Das Logo (`www/local/aecc_local_plugin/logo.png`) stammt von der offiziellen Allwei-Website [allwei.de](https://www.allwei.de) und wird hier ausschließlich zur Wiedererkennbarkeit der Integration verwendet. Alle Marken- und Urheberrechte liegen bei den jeweiligen Eigentümern.
+
+---
+
+## Haftungsausschluss & Keine Zugehörigkeit
+
+Dieses Projekt ist ein **unabhängiges Community-Projekt** und steht in **keinerlei Verbindung** mit der Allwei GmbH, deren Muttergesellschaft, Tochtergesellschaften oder Partnern. Es handelt sich weder um ein offizielles Produkt noch um eine offiziell unterstützte Lösung von Allwei.
+
+Die Bezeichnung „Allwei" sowie zugehörige Logos und Markenzeichen sind Eigentum ihrer jeweiligen Inhaber. Die Nutzung in diesem Projekt erfolgt ausschließlich zur Identifikation der kompatiblen Hardware.
+
+Die Verwendung dieser Integration erfolgt auf eigene Verantwortung. Der Autor übernimmt keine Haftung für Schäden an Geräten, Datenverlust oder andere Folgen, die durch den Einsatz dieser Software entstehen können.
 
 ---
 
