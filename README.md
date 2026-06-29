@@ -72,41 +72,7 @@ config/
 
 ---
 
-### Schritt 3 — Frontend-Panel einrichten
-
-Das Panel zeigt Energiefluss-Grafiken und Steuerungselemente in der Seitenleiste.
-
-1. Prüfe ob der Ordner `config/www/` existiert — falls nicht, erstelle ihn
-2. Kopiere `aecc-ha-panel.mjs` direkt in den `www`-Ordner:
-
-```
-config/
-└── www/
-    └── aecc-ha-panel.mjs    ← hier einfügen
-```
-
-3. Öffne `config/configuration.yaml` (z.B. mit dem File Editor Add-on)
-4. Füge am Ende der Datei folgenden Block hinzu:
-
-```yaml
-panel_custom:
-  - name: aecc-ha-panel
-    sidebar_title: Allwei Dashboard
-    sidebar_icon: mdi:chart-donut
-    module_url: /local/aecc-ha-panel.mjs
-```
-
----
-
-### Schritt 4 — Aktivierung
-
-1. Starte Home Assistant erneut neu: **Einstellungen → System → Neustart**
-2. Lade deinen Browser-Tab vollständig neu (ggf. Cache leeren mit `Strg+Shift+R`)
-3. In der linken Seitenleiste erscheint der neue Eintrag **Allwei Dashboard**
-
----
-
-### Schritt 5 — Gerät einrichten
+### Schritt 3 — Gerät einrichten
 
 **Automatische Erkennung (empfohlen)**
 
@@ -216,11 +182,6 @@ Wechselrichter · Batterie · Steckdosen · Ladestation · Heizung
 - Der rohe TCP-Response wird auf `INFO`-Level geloggt — suche nach `Received raw response:` um zu sehen, was das Gateway zurückgibt
 - Gateway-Port erreichbar prüfen: `nc -zv <gateway-ip> 8899`
 
-**Panel erscheint nicht in der Seitenleiste**
-- Prüfe ob `aecc-ha-panel.mjs` korrekt in `config/www/` liegt
-- Prüfe ob der `panel_custom`-Block korrekt in `configuration.yaml` eingetragen ist (YAML-Einrückung beachten)
-- HA nach dem zweiten Neustart im Browser-Cache leeren (`Strg+Shift+R`)
-
 **Wechselrichter-Schalter reagieren nicht**
 - Das lokale Gateway muss `{"Set": "InverterParam"}` unterstützen — prüfe die Firmware-Version deines Gateways
 - Alternativ sind Register-Adresse und gesendeter Wert als Extra-Attribute an jeder Switch-Entität sichtbar (zur Diagnose)
@@ -262,7 +223,7 @@ Der `EnergyParameter`-Response des Gateways enthält meist mehr Felder als aktue
 
 ## Bildnachweis
 
-Das Logo (`www/local/aecc_local_plugin/logo.png`) stammt von der offiziellen Allwei-Website [allwei.de](https://www.allwei.de) und wird hier ausschließlich zur Wiedererkennbarkeit der Integration verwendet. Alle Marken- und Urheberrechte liegen bei den jeweiligen Eigentümern.
+Das Logo (`www/local/allwei_local_plugin/logo.png`) stammt von der offiziellen Allwei-Website [allwei.de](https://www.allwei.de) und wird hier ausschließlich zur Wiedererkennbarkeit der Integration verwendet. Alle Marken- und Urheberrechte liegen bei den jeweiligen Eigentümern.
 
 ---
 
