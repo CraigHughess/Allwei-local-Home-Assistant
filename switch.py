@@ -22,28 +22,6 @@ SWITCH_MAP = {
     }
 }
 
-# Storage-level hardware switches controlled via register writes.
-INVERTER_SWITCH_DEFS = [
-    {
-        "key": "ac_offgrid",
-        "name": "AC Off-Grid Mode",
-        "register": 123,
-        "state_source": ("SSumInfoList", "ACRelayStatus"),
-    },
-    {
-        "key": "max_feedin",
-        "name": "Max Feed-In Power",
-        "register": 124,
-        "state_source": ("SSumInfoList", "MaxFeedPowerFlag"),
-    },
-    {
-        "key": "discharge",
-        "name": "Battery Discharge",
-        "register": 125,
-        "state_source": ("SSumInfoList", "BasicDisChargeEnable"),
-    },
-]
-
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -55,7 +33,6 @@ async def async_setup_entry(
 
     switches = []
 
-    # Sub-device switches (plugs, chargers, heaters)
     for data_type, field_map in SWITCH_MAP.items():
         raw_data = coordinator.data.get(data_type)
         if not raw_data:
@@ -80,10 +57,6 @@ async def async_setup_entry(
                     switches.append(
                         AECCSwitch(coordinator, device_sn, item, data_type, key, path, name, attr)
                     )
-
-    # Storage-level hardware switches
-    for switch_def in INVERTER_SWITCH_DEFS:
-        switches.append(AECCInverterSwitch(coordinator, device_sn, switch_def))
 
     async_add_entities(switches)
 
@@ -161,85 +134,3 @@ class AECCSwitch(CoordinatorEntity, SwitchEntity):
     @property
     def extra_state_attributes(self):
         return self._attr
-
-
-class AECCInverterSwitch(CoordinatorEntity, SwitchEntity):
-    """Storage-level switch controlled via hardware register writes."""
-
-    def __init__(self, coordinator, device_sn, switch_def):
-        super().__init__(coordinator)
-        self._device_sn = device_sn
-        self._key = switch_def["key"]
-        self._switch_name = switch_def["name"]
-        self._register = switch_def["register"]
-        self._state_source = switch_def["state_source"]
-        # Optimistic state: tracks last sent command until coordinator confirms
-        self._optimistic_state: bool = False
-
-    @property
-    def unique_id(self):
-        return f"aecc_{self._device_sn}_inverter_{self._key}"
-
-    @property
-    def name(self):
-        return self._switch_name
-
-    @property
-    def assumed_state(self) -> bool:
-        return False
-
-    @property
-    def is_on(self) -> bool:
-        # Prefer live coordinator data over optimistic state
-        data_type, field = self._state_source
-        raw = self.coordinator.data.get(data_type) if self.coordinator.data else None
-        if isinstance(raw, dict):
-            val = raw.get(field)
-            if val is not None:
-                try:
-                    return int(val) == 1
-                except (ValueError, TypeError):
-                    pass
-        # Fall back to last known optimistic state (always a bool, never None)
-        return self._optimistic_state
-
-    def _get_storage_dev_addr(self) -> int:
-        """Return the DevAddr of the first storage device, falling back to 1."""
-        storage_list = (self.coordinator.data or {}).get("Storage_list", [])
-        if isinstance(storage_list, list) and storage_list:
-            return storage_list[0].get("DevAddr", 1)
-        return 1
-
-    async def async_turn_on(self, **kwargs):
-        _LOGGER.info(f"Inverter switch ON: {self._switch_name} (register {self._register})")
-        dev_addr = self._get_storage_dev_addr()
-        success = await self.coordinator.client.send_hardware_param(self._register, 1, dev_addr)
-        if success:
-            self._optimistic_state = True
-        self.async_write_ha_state()
-        await self.coordinator.async_request_refresh()
-
-    async def async_turn_off(self, **kwargs):
-        _LOGGER.info(f"Inverter switch OFF: {self._switch_name} (register {self._register})")
-        dev_addr = self._get_storage_dev_addr()
-        success = await self.coordinator.client.send_hardware_param(self._register, 0, dev_addr)
-        if success:
-            self._optimistic_state = False
-        self.async_write_ha_state()
-        await self.coordinator.async_request_refresh()
-
-    @property
-    def extra_state_attributes(self):
-        return {
-            "register_address": self._register,
-            "state_field": f"{self._state_source[0]}.{self._state_source[1]}",
-        }
-
-    @property
-    def device_info(self):
-        return {
-            "identifiers": {(DOMAIN, self._device_sn)},
-            "name": self._device_sn,
-            "model": "Inverter",
-            "manufacturer": "Allwei",
-        }

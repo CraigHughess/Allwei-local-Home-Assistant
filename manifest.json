@@ -7,7 +7,7 @@
   "requirements": ["zeroconf>=0.36.8"],
   "zeroconf": ["_http._tcp.local."],
   "i18n": true,
-  "version": "1.1.0",
+  "version": "1.0.0",
   "i18n_plural": false,
   "logos": {
     "default": "/local/aecc_local_plugin/logo.png"
