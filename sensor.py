@@ -24,17 +24,6 @@ SENSOR_MAP = {
         "grid_output_power": ("TotalGridOutputPower", UnitOfPower.WATT),
         "backup_power": ("TotalBackUpPower", UnitOfPower.WATT),
     },
-    "Storage_list": {
-        "battery_soc": ("BatterySoc", PERCENTAGE),
-        "battery_discharging_power": ("BatteryDischargingPower", UnitOfPower.WATT),
-        "battery_charging_power": ("BatteryChargingPower", UnitOfPower.WATT),
-        "pv_charging_power": ("PvChargingPower", UnitOfPower.WATT),
-        "ac_charging_power": ("AcChargingPower", UnitOfPower.WATT),
-        "ac_in_active_power": ("AcInActivePower", UnitOfPower.WATT),
-        "offgrid_load_power": ("OffGridLoadPower", UnitOfPower.WATT),
-        "pv1_power": ("Pv1Power", UnitOfPower.WATT),
-        "pv2_power": ("Pv2Power", UnitOfPower.WATT),
-    },
     "PlugInfoList": {
         "active_power": ("PlugActvePower", UnitOfPower.WATT),
     },
@@ -162,7 +151,6 @@ class AECCSensor(CoordinatorEntity, SensorEntity):
     def device_info(self):
         model_map = {
             "SSumInfoList": "System Summary",
-            "Storage_list": "Battery Storage",
             "PlugInfoList": "Smart Plug",
             "ChargerInfoList": "EV Charger",
             "HotInfoList": "Heater"
