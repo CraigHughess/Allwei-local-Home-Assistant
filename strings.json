@@ -1,0 +1,20 @@
+{
+  "name": "Example Zeroconf Integration",
+  "description": "An integration that discovers devices via Zeroconf.",
+  "options": {
+    "title": "Settings"
+  },
+  "device_name": "Example Device",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add Example Device",
+        "data": {
+          "host": "Host",
+          "port": "Port",
+          "name": "Device Name"
+        }
+      }
+    }
+  }
+}

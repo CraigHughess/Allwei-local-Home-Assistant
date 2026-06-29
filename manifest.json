@@ -1,0 +1,15 @@
+{
+  "domain": "aecc_local_plugin",
+  "name": "AECC Local",
+  "documentation": "https://www.home-assistant.io/integrations/example_zeroconf",
+  "dependencies": [],
+  "codeowners": ["@excalibur"],
+  "requirements": ["zeroconf>=0.36.8"],
+  "zeroconf": ["_http._tcp.local."],
+  "i18n": true,
+  "version": "1.1.0",
+  "i18n_plural": false,
+  "logos": {
+    "default": "/local/aecc_local_plugin/logo.png"
+  }
+}
