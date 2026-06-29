@@ -51,12 +51,12 @@ Für die Installation musst du Dateien auf deinen Raspberry Pi übertragen. Nutz
 
 1. Lade dieses Repository als ZIP herunter (oder klone es)
 2. Prüfe ob der Ordner `config/custom_components/` existiert — falls nicht, erstelle ihn
-3. Kopiere den Ordner `aecc_local_plugin` in `config/custom_components/`:
+3. Kopiere den Ordner `allwei_local_plugin` in `config/custom_components/`:
 
 ```
 config/
 └── custom_components/
-    └── aecc_local_plugin/    ← hier einfügen
+    └── allwei_local_plugin/    ← hier einfügen
         ├── __init__.py
         ├── manifest.json
         ├── config_flow.py
@@ -178,7 +178,7 @@ Wechselrichter · Batterie · Steckdosen · Ladestation · Heizung
 - Nutze die manuelle Einrichtung mit der Gateway-IP
 
 **Entitäten zeigen "Nicht verfügbar"**
-- HA-Logs öffnen und nach `aecc_local_plugin` filtern
+- HA-Logs öffnen und nach `allwei_local_plugin` filtern
 - Der rohe TCP-Response wird auf `INFO`-Level geloggt — suche nach `Received raw response:` um zu sehen, was das Gateway zurückgibt
 - Gateway-Port erreichbar prüfen: `nc -zv <gateway-ip> 8899`
 
