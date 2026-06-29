@@ -1,11 +1,22 @@
 import logging
+from typing import Mapping, Any
 
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.const import UnitOfPower, UnitOfTemperature, PERCENTAGE
+from homeassistant.const import (
+    UnitOfPower,
+    PERCENTAGE,
+)
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
+
+# 用于映射单位
+from homeassistant.const import (
+    UnitOfPower,
+    PERCENTAGE,
+    UnitOfTemperature,
+)
 
 SENSOR_MAP = {
     "SSumInfoList": {
@@ -42,28 +53,40 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     device_sn = config_entry.data["device_sn"]
 
     sensors = []
+    # 遍历map
     for data_type, field_map in SENSOR_MAP.items():
         raw_data = coordinator.data.get(data_type)
         if not raw_data:
-            continue
+            continue  # 数据不存在，跳过
 
         if isinstance(raw_data, list):
+            # 遍历各个设备数组
             for item in raw_data:
                 sn = item.get("PlugSN") or item.get("ChargerSN") or item.get("HotSN")
                 if not sn:
-                    continue
+                    continue  # 缺少 SN，跳过
+
                 for key, (path, unit) in field_map.items():
-                    if item.get(path) is None:
-                        continue
+                    value = item.get(path)
+                    if value is None:
+                        continue  # 字段缺失，跳过
+
+                    unique_id = f"{device_sn}_{data_type.lower()}_{sn}_{key}"
+
                     sensors.append(
                         AECCSensor(coordinator, device_sn, item, data_type, key, path, unit)
                     )
         else:
+            # 非列表结构（如 SSumInfoList）
+            item = raw_data
             for key, (path, unit) in field_map.items():
-                if raw_data.get(path) is None:
-                    continue
+                value = item.get(path)
+                if value is None:
+                    continue  # 字段缺失，跳过
+
+                unique_id = f"{device_sn}_{data_type.lower()}_{key}"
                 sensors.append(
-                    AECCSensor(coordinator, device_sn, raw_data, data_type, key, path, unit)
+                    AECCSensor(coordinator, device_sn, item, data_type, key, path, unit)
                 )
 
     async_add_entities(sensors)
@@ -81,32 +104,20 @@ class AECCSensor(CoordinatorEntity, SensorEntity):
         self._unit = unit
         self._unique_id = self._generate_unique_id(device_sn, item)
 
-    def _device_sn_from_item(self, item):
-        return item.get("PlugSN") or item.get("ChargerSN") or item.get("HotSN")
-
     def _generate_unique_id(self, device_sn, item):
-        sn = self._device_sn_from_item(item)
+        sn = item.get("PlugSN") or item.get("ChargerSN") or item.get("HotSN")
         if sn:
             return f"aecc_{device_sn}_{self._data_type.lower()}_{sn}_{self._key}"
-        return f"aecc_{device_sn}_{self._data_type.lower()}_{self._key}"
-
-    def _get_current_item(self):
-        raw = self.coordinator.data.get(self._data_type) if self.coordinator.data else None
-        if isinstance(raw, list):
-            own_sn = self._device_sn_from_item(self._item)
-            for item in raw:
-                if self._device_sn_from_item(item) == own_sn:
-                    return item
-        elif isinstance(raw, dict):
-            return raw
-        return self._item
+        else:
+            return f"aecc_{device_sn}_{self._data_type.lower()}_{self._key}"
 
     @property
     def name(self):
-        sn = self._device_sn_from_item(self._item)
+        sn = self._item.get("PlugSN") or self._item.get("ChargerSN") or self._item.get("HotSN")
         if sn:
             return f"{sn} {self._key.replace('_', ' ').title()}"
-        return f"{self._key.replace('_', ' ').title()}"
+        else:
+            return f"{self._key.replace('_', ' ').title()}"
 
     @property
     def unique_id(self):
@@ -114,16 +125,45 @@ class AECCSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def native_value(self):
-        value = self._get_current_item().get(self._path)
-        _LOGGER.debug(f"Sensor {self._path}: {value}")
-        if self._data_type == "HotInfoList" and self._path in ("HotTEMP", "HotTEMPMAX"):
+        # Fehlerbehebung: Daten dynamisch aus dem Coordinator laden statt aus dem statischen Start-Objekt
+        if not self.coordinator.data:
+            return 0.0
+            
+        raw_data = self.coordinator.data.get(self._data_type)
+        if not raw_data:
+            return 0.0
+
+        if isinstance(raw_data, list):
+            # Für Listenstrukturen (Plugs, Charger, Heaters) das passende Gerät über die Seriennummer finden
+            target_sn = self._item.get("PlugSN") or self._item.get("ChargerSN") or self._item.get("HotSN")
+            current_item = None
+            for item in raw_data:
+                sn = item.get("PlugSN") or item.get("ChargerSN") or item.get("HotSN")
+                if sn == target_sn:
+                    current_item = item
+                    break
+        else:
+            # Für einfache Strukturen wie SSumInfoList
+            current_item = raw_data
+
+        if not current_item:
+            return 0.0
+
+        value = current_item.get(self._path)
+        _LOGGER.debug(f"解析的key{self._path} value：{value}")
+        
+        if self._data_type == "HotInfoList" and self._path in ["HotTEMP", "HotTEMPMAX"]:
             try:
                 return float(value) / 10 if value is not None else 0.0
             except (ValueError, TypeError):
                 return 0.0
-        try:
-            return float(value) if value is not None else 0.0
-        except (ValueError, TypeError):
+
+        if value is not None:
+            try:
+                return float(value)
+            except (ValueError, TypeError):
+                return 0.0
+        else:
             return 0.0
 
     @property
@@ -136,11 +176,13 @@ class AECCSensor(CoordinatorEntity, SensorEntity):
             "SSumInfoList": "System Summary",
             "PlugInfoList": "Smart Plug",
             "ChargerInfoList": "EV Charger",
-            "HotInfoList": "Heater",
+            "HotInfoList": "Heater"
         }
+        model = model_map.get(self._data_type, self._data_type)
+
         return {
             "identifiers": {(DOMAIN, self._device_sn)},
             "name": self._device_sn,
-            "model": model_map.get(self._data_type, self._data_type),
-            "manufacturer": "Allwei",
+            "model": model,
+            "manufacturer": "AECC",
         }
