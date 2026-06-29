@@ -1,5 +1,4 @@
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.const import STATE_OFF, STATE_ON
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntry
@@ -24,9 +23,7 @@ SWITCH_MAP = {
 }
 
 # Inverter-level hardware switches controlled via register writes.
-# Register addresses confirmed from cloud API analysis (setDeviceParam startAddr).
-# State fields are best-effort reads from EnergyParameter response; the switch
-# falls back to optimistic tracking if the field is absent in the local response.
+# Register addresses confirmed from cloud API (setDeviceParam startAddr).
 INVERTER_SWITCH_DEFS = [
     {
         "key": "ac_offgrid",
@@ -72,14 +69,15 @@ async def async_setup_entry(
                     continue
 
                 for key, (path, name) in field_map.items():
-                    value = item.get(path)
-                    if value is None:
+                    if item.get(path) is None:
                         continue
                     attr = {
                         "dev_addr": item.get("DevAddr"),
-                        "is_third_party": item.get("lsThirdParty"),
+                        # DevType from device data — fallback to 200 (plug) if absent
+                        "dev_type": item.get("DevType", 200),
+                        "is_third_party": item.get("lsThirdParty", 0),
                         "fans_dev_type": item.get("FansDevType"),
-                        "is_interconnect": item.get("IsInterconnect"),
+                        "is_interconnect": item.get("IsInterconnect", 0),
                     }
                     switches.append(
                         AECCSwitch(coordinator, device_sn, item, data_type, key, path, name, attr)
@@ -101,64 +99,69 @@ class AECCSwitch(CoordinatorEntity, SwitchEntity):
         self._key = key
         self._path = path
         self._name = name
-        self._unique_id = self._generate_unique_id(device_sn, item)
         self._attr = attr
-        _LOGGER.info(f"self._state: {self._item.get(self._path)}")
-        self._state= self._item.get(self._path)
+        self._unique_id = self._generate_unique_id(device_sn, item)
 
     def _generate_unique_id(self, device_sn, item):
         sn = item.get("PlugSN") or item.get("ChargerSN") or item.get("HotSN")
         if sn:
             return f"aecc_{device_sn}_{self._data_type.lower()}_{sn}_{self._key}"
-        else:
-            return f"aecc_{device_sn}_{self._data_type.lower()}_{self._key}"
+        return f"aecc_{device_sn}_{self._data_type.lower()}_{self._key}"
+
+    def _get_current_item(self):
+        """Read fresh item data from the coordinator instead of stale snapshot."""
+        raw = self.coordinator.data.get(self._data_type) if self.coordinator.data else None
+        if isinstance(raw, list):
+            own_sn = (self._item.get("PlugSN") or
+                      self._item.get("ChargerSN") or
+                      self._item.get("HotSN"))
+            for item in raw:
+                sn = item.get("PlugSN") or item.get("ChargerSN") or item.get("HotSN")
+                if sn == own_sn:
+                    return item
+        return self._item
+
     @property
     def name(self):
         sn = self._item.get("PlugSN") or self._item.get("ChargerSN") or self._item.get("HotSN")
         if sn:
             return f"{sn} {self._key.replace('_', ' ').title()}"
-        else:
-            return f"{self._key.replace('_', ' ').title()}"
+        return f"{self._key.replace('_', ' ').title()}"
 
     @property
     def unique_id(self):
         return self._unique_id
 
     @property
+    def assumed_state(self) -> bool:
+        return False
+
+    @property
     def is_on(self):
-          return  True if self._state==1 else False
-  # PlugStatus: 1 表示开启
+        val = self._get_current_item().get(self._path)
+        return int(val) == 1 if val is not None else False
 
     async def async_turn_on(self, **kwargs):
-        """发送打开命令"""
-        sn = self._item.get("PlugSN") or self._item.get("ChargerSN") or self._item.get("HotSN")
-        if sn:
-            _LOGGER.info(f"Turning on switch: {sn}")
-            # 假设 client 提供了 turn_on_plug 方法
-            await self.coordinator.client.turn_on_switch(self._attr)
-            self._state = 1
+        _LOGGER.info(f"Turning on: {self.name}")
+        await self.coordinator.client.turn_on_switch(self._attr)
+        await self.coordinator.async_request_refresh()
 
-            await self.coordinator.async_request_refresh()
     async def async_turn_off(self, **kwargs):
-        """发送关闭命令"""
-        sn = self._item.get("PlugSN") or self._item.get("ChargerSN") or self._item.get("HotSN")
-        if sn:
-            _LOGGER.info(f"Turning off switch: {sn}")
-            await self.coordinator.client.turn_off_switch(self._attr)
-            self._state = 0
-            await self.coordinator.async_request_refresh()
+        _LOGGER.info(f"Turning off: {self.name}")
+        await self.coordinator.client.turn_off_switch(self._attr)
+        await self.coordinator.async_request_refresh()
 
     @property
     def device_info(self):
-        # sn = self._item.get("PlugSN") or self._item.get("ChargerSN") or self._item.get("HotSN")
         return {
             "identifiers": {(DOMAIN, self._device_sn)},
             "name": self._device_sn,
-            "model": "smart load",
-            "manufacturer": "AECC",
+            "model": "Smart Load",
+            "manufacturer": "Allwei",
         }
+
     @property
-    def extra_state_attributes(self) :
+    def extra_state_attributes(self):
         return self._attr
 
 
@@ -172,7 +175,8 @@ class AECCInverterSwitch(CoordinatorEntity, SwitchEntity):
         self._switch_name = switch_def["name"]
         self._register = switch_def["register"]
         self._state_source = switch_def["state_source"]
-        self._optimistic_state = None
+        # Optimistic state: tracks last sent command until coordinator confirms
+        self._optimistic_state: bool = False
 
     @property
     def unique_id(self):
@@ -183,7 +187,12 @@ class AECCInverterSwitch(CoordinatorEntity, SwitchEntity):
         return self._switch_name
 
     @property
-    def is_on(self):
+    def assumed_state(self) -> bool:
+        return False
+
+    @property
+    def is_on(self) -> bool:
+        # Prefer live coordinator data over optimistic state
         data_type, field = self._state_source
         raw = self.coordinator.data.get(data_type) if self.coordinator.data else None
         if isinstance(raw, dict):
@@ -193,18 +202,23 @@ class AECCInverterSwitch(CoordinatorEntity, SwitchEntity):
                     return int(val) == 1
                 except (ValueError, TypeError):
                     pass
+        # Fall back to last known optimistic state (always a bool, never None)
         return self._optimistic_state
 
     async def async_turn_on(self, **kwargs):
+        _LOGGER.info(f"Inverter switch ON: {self._switch_name} (register {self._register})")
         success = await self.coordinator.client.send_hardware_param(self._register, 1)
         if success:
             self._optimistic_state = True
+        self.async_write_ha_state()
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs):
+        _LOGGER.info(f"Inverter switch OFF: {self._switch_name} (register {self._register})")
         success = await self.coordinator.client.send_hardware_param(self._register, 0)
         if success:
             self._optimistic_state = False
+        self.async_write_ha_state()
         await self.coordinator.async_request_refresh()
 
     @property
@@ -220,5 +234,5 @@ class AECCInverterSwitch(CoordinatorEntity, SwitchEntity):
             "identifiers": {(DOMAIN, self._device_sn)},
             "name": self._device_sn,
             "model": "Inverter",
-            "manufacturer": "AECC",
+            "manufacturer": "Allwei",
         }
